@@ -1,0 +1,113 @@
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #f6f7fb;
+}
+
+.page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+.search-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+input, select, button {
+  padding: 0.6rem;
+}
+
+.url-input {
+  width: 100%;
+}
+
+.criteria-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr 1.5fr 2fr auto;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+}
+
+th, td {
+  border: 1px solid #ddd;
+  padding: 0.5rem;
+  text-align: left;
+}
+
+.sort-btn {
+  border: none;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.error {
+  color: #b00020;
+}
+
+.warn {
+  color: #995700;
+}
+
+.filters-summary {
+  margin: 0 0 0.6rem;
+  color: #3b3b3b;
+}
+
+.progress-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  margin-bottom: 0.6rem;
+  border-radius: 6px;
+  background: #eef5ff;
+  color: #12407a;
+  font-weight: 600;
+}
+
+.progress-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #b8cff3;
+  border-top-color: #12407a;
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.history-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.danger-btn {
+  background: #b00020;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+}
+
+.danger-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

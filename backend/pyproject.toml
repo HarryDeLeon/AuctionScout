@@ -1,0 +1,30 @@
+[project]
+name = "auction-scout-backend"
+version = "0.1.0"
+description = "Auction Scout FastAPI backend"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.116.0",
+  "uvicorn>=0.35.0",
+  "sqlalchemy[asyncio]>=2.0.36",
+  "pydantic>=2.9.2",
+  "pydantic-settings>=2.6.1",
+  "httpx>=0.28.1",
+  "aiosqlite>=0.20.0",
+  "sse-starlette>=2.1.3",
+  "beautifulsoup4>=4.12.3",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3.3",
+]
+
+[build-system]
+requires = ["setuptools>=69.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+markers = [
+  "live: optional live smoke tests against real auction sites",
+]
