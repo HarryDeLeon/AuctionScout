@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime
 import re
 from typing import Iterable
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
@@ -40,17 +39,6 @@ class UrbanAuctionsAdapter:
         new_query = urlencode(query)
         return urlunparse((parsed.scheme, parsed.netloc, parsed.path, parsed.params, new_query, parsed.fragment))
 
-    @staticmethod
-    def _parse_end_time(value: str | None) -> datetime | None:
-        if not value:
-            return None
-        for fmt in ("%m/%d/%Y %H:%M:%S", "%m/%d/%Y %I:%M:%S %p"):
-            try:
-                return datetime.strptime(value.strip(), fmt)
-            except ValueError:
-                continue
-        return None
-
     def parse_lots(self, html: str, source_url: str, max_items: int = 50) -> list[LotRecord]:
         soup = BeautifulSoup(html, "html.parser")
         lots: list[LotRecord] = []
@@ -85,10 +73,6 @@ class UrbanAuctionsAdapter:
             if description and "current bid" in description.lower() and "time remaining" in description.lower():
                 description = None
             ends_at = end_time_el.get("data-action-time") if end_time_el else None
-            end_dt = self._parse_end_time(ends_at)
-            is_active = True
-            if end_dt is not None and end_dt <= datetime.now():
-                is_active = False
             lots.append(
                 LotRecord(
                     lot_number=lot_number,
@@ -103,7 +87,7 @@ class UrbanAuctionsAdapter:
                     buyers_premium_pct=None,
                     ends_at=ends_at,
                     lot_url=resolve_link(source_url, link_el.get("href") if link_el else None),
-                    is_active=is_active,
+                    is_active=True,
                     raw={"source": "html"},
                     confidence=0.6,
                 )
