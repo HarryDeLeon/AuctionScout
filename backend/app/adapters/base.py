@@ -19,6 +19,7 @@ class LotRecord:
     buyers_premium_pct: float | None
     ends_at: str | None
     lot_url: str | None
+    is_active: bool = True
     raw: dict = field(default_factory=dict)
     confidence: float = 0.7
 

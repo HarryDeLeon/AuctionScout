@@ -54,7 +54,8 @@ type SearchDetail = SearchSummary & {
 type SortField = "lot" | "title" | "bid" | "quick_bid" | "low" | "high" | "median" | "confidence" | "margin";
 type SortDirection = "asc" | "desc";
 
-const API_BASE = "http://localhost:8000";
+const envApiBase = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
+const API_BASE = (envApiBase && envApiBase.length > 0 ? envApiBase : "http://localhost:8000").replace(/\/+$/, "");
 
 export function App() {
   const [searchName, setSearchName] = useState("");

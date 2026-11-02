@@ -52,6 +52,7 @@ def test_urbanauctions_gallery_fixture_parse():
     assert lots[0].current_bid == 20.00
     assert lots[0].opening_bid == 25.00
     assert lots[0].lot_url == "https://urbanauctions.ca/Event/LotDetails/172201544/NEW-MILWAUKEE-M12-RED-LITHIUM-CP15-BATTERY"
+    assert lots[0].is_active
 
 
 def test_generic_fixture_parse():

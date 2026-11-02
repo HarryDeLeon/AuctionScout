@@ -43,6 +43,10 @@ def _lot_matches_price_filters(lot, min_price: float | None, max_price: float | 
     return False
 
 
+def _lot_is_active(lot) -> bool:
+    return bool(getattr(lot, "is_active", True))
+
+
 def _lot_price_value(lot) -> float:
     value = lot.current_bid if lot.current_bid is not None else lot.opening_bid
     if value is None:
@@ -72,6 +76,8 @@ async def run_search(search_id: int) -> None:
             fetched = await adapter.fetch_lots(search.url, max_items=max(search.max_items * 3, 30))
             kept = []
             for lot in fetched:
+                if not _lot_is_active(lot):
+                    continue
                 if not _lot_matches_price_filters(lot, search.min_price, search.max_price):
                     continue
                 if not _keyword_match(f"{lot.title} {lot.description or ''}", search.keywords):

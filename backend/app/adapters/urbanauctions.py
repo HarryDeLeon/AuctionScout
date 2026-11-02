@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from datetime import datetime
 import re
 from typing import Iterable
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 import httpx
 from bs4 import BeautifulSoup
@@ -29,6 +31,26 @@ class UrbanAuctionsAdapter:
         cleaned = re.sub(r"\s+", " ", cleaned).strip()
         return cleaned
 
+    @staticmethod
+    def _active_only_url(url: str) -> str:
+        parsed = urlparse(url)
+        query = dict(parse_qsl(parsed.query, keep_blank_values=True))
+        query["StatusFilter"] = "active_only"
+        query.setdefault("ViewStyle", "grid")
+        new_query = urlencode(query)
+        return urlunparse((parsed.scheme, parsed.netloc, parsed.path, parsed.params, new_query, parsed.fragment))
+
+    @staticmethod
+    def _parse_end_time(value: str | None) -> datetime | None:
+        if not value:
+            return None
+        for fmt in ("%m/%d/%Y %H:%M:%S", "%m/%d/%Y %I:%M:%S %p"):
+            try:
+                return datetime.strptime(value.strip(), fmt)
+            except ValueError:
+                continue
+        return None
+
     def parse_lots(self, html: str, source_url: str, max_items: int = 50) -> list[LotRecord]:
         soup = BeautifulSoup(html, "html.parser")
         lots: list[LotRecord] = []
@@ -51,6 +73,7 @@ class UrbanAuctionsAdapter:
             desc_el = card.select_one(".description, p")
             price_el = card.select_one(".awe-rt-CurrentPrice .NumberPart, .galleryPrice .NumberPart, .bid, .current-bid, .price")
             opening_bid_el = card.select_one(".awe-rt-MinimumBid .NumberPart")
+            end_time_el = card.select_one("[data-action-time]")
             image_el = card.select_one("img")
             link_el = card.select_one("h2.galleryTitle a[href], .galleryImage a[href], a[href]")
             lot_number_text = lot_number_el.get_text(" ", strip=True) if lot_number_el else None
@@ -61,6 +84,11 @@ class UrbanAuctionsAdapter:
             description = desc_el.get_text(" ", strip=True) if desc_el else None
             if description and "current bid" in description.lower() and "time remaining" in description.lower():
                 description = None
+            ends_at = end_time_el.get("data-action-time") if end_time_el else None
+            end_dt = self._parse_end_time(ends_at)
+            is_active = True
+            if end_dt is not None and end_dt <= datetime.now():
+                is_active = False
             lots.append(
                 LotRecord(
                     lot_number=lot_number,
@@ -73,8 +101,9 @@ class UrbanAuctionsAdapter:
                     estimate_high=None,
                     currency="CAD",
                     buyers_premium_pct=None,
-                    ends_at=None,
+                    ends_at=ends_at,
                     lot_url=resolve_link(source_url, link_el.get("href") if link_el else None),
+                    is_active=is_active,
                     raw={"source": "html"},
                     confidence=0.6,
                 )
@@ -83,7 +112,8 @@ class UrbanAuctionsAdapter:
 
     async def fetch_lots(self, url: str, max_items: int = 50) -> list[LotRecord]:
         headers = {"User-Agent": "Mozilla/5.0 AuctionScout/1.0"}
+        target_url = self._active_only_url(url)
         async with httpx.AsyncClient(timeout=20.0, follow_redirects=True, headers=headers) as client:
-            response = await client.get(url)
+            response = await client.get(target_url)
             response.raise_for_status()
-        return self.parse_lots(response.text, source_url=url, max_items=max_items)
+        return self.parse_lots(response.text, source_url=target_url, max_items=max_items)
