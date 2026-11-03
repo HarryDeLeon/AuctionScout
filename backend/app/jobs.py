@@ -115,7 +115,7 @@ async def run_search(search_id: int) -> None:
                 db.add(lot)
                 await db.flush()
 
-                query, comps, agg, warning = await pipeline.run(lot.title, lot.description)
+                query, comps, agg, warning = await pipeline.run(lot.title, lot.description, image_url=lot.image_url)
                 run = ResearchRun(
                     lot_id=lot.id,
                     query_text=query,
@@ -170,7 +170,13 @@ async def rerun_lot_research(db: AsyncSession, lot_id: int, query: str | None, u
     lot = await db.get(Lot, lot_id)
     if not lot:
         raise ValueError("Lot not found")
-    query_text, comps, agg, warning = await pipeline.run(lot.title, lot.description, query=query, use_image=use_image)
+    query_text, comps, agg, warning = await pipeline.run(
+        lot.title,
+        lot.description,
+        query=query,
+        use_image=use_image,
+        image_url=lot.image_url,
+    )
     run = ResearchRun(
         lot_id=lot.id,
         query_text=query_text,

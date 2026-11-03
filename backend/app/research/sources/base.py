@@ -22,5 +22,10 @@ class SourceConfigurationError(RuntimeError):
 
 
 class PriceSource(Protocol):
-    async def search(self, query: str, use_image: bool = False) -> list[ComparableRecord]:
+    async def search(
+        self,
+        query: str,
+        use_image: bool = False,
+        image_url: str | None = None,
+    ) -> list[ComparableRecord]:
         ...

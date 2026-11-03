@@ -7,7 +7,13 @@ from app.research.sources.base import ComparableRecord, SourceConfigurationError
 
 
 class EbayBrowseSource:
-    async def search(self, query: str, use_image: bool = False) -> list[ComparableRecord]:
+    async def search(
+        self,
+        query: str,
+        use_image: bool = False,
+        image_url: str | None = None,
+    ) -> list[ComparableRecord]:
+        del use_image, image_url
         if not settings.ebay_access_token:
             raise SourceConfigurationError("eBay access token is not configured")
 

@@ -137,8 +137,13 @@ class DuckDuckGoPriceSource:
                 continue
         return None, "CAD"
 
-    async def search(self, query: str, use_image: bool = False) -> list[ComparableRecord]:
-        del use_image
+    async def search(
+        self,
+        query: str,
+        use_image: bool = False,
+        image_url: str | None = None,
+    ) -> list[ComparableRecord]:
+        del use_image, image_url
         q = f"{query} price"
         headers = {
             "User-Agent": "Mozilla/5.0",

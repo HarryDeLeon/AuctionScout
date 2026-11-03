@@ -70,6 +70,7 @@ export function App() {
   const [history, setHistory] = useState<SearchSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [rerunLotId, setRerunLotId] = useState<number | null>(null);
   const [sortField, setSortField] = useState<SortField>("margin");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
@@ -248,6 +249,29 @@ export function App() {
     }
   }
 
+  async function rerunWithImage(lotId: number) {
+    if (!search) {
+      return;
+    }
+    setError(null);
+    setRerunLotId(lotId);
+    try {
+      const res = await fetch(`${API_BASE}/api/lots/${lotId}/research`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ use_image: true }),
+      });
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
+      await loadSearch(search.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Image rerun failed");
+    } finally {
+      setRerunLotId(null);
+    }
+  }
+
   function findComparableForValue(lot: Lot, value: number | null, mode: "min" | "max" | "closest"): Comparable | null {
     if (value === null) {
       return null;
@@ -280,6 +304,13 @@ export function App() {
         {value}
       </a>
     );
+  }
+
+  function hasAutoImageRecheck(research: Research | null): boolean {
+    if (!research?.warning) {
+      return false;
+    }
+    return research.warning.toLowerCase().includes("auto image recheck applied");
   }
 
   return (
@@ -337,6 +368,7 @@ export function App() {
                 <th><button type="button" className="sort-btn" onClick={() => onSort("high")}>{sortLabel("high", "Market high")}</button></th>
                 <th><button type="button" className="sort-btn" onClick={() => onSort("median")}>{sortLabel("median", "Median")}</button></th>
                 <th><button type="button" className="sort-btn" onClick={() => onSort("confidence")}>{sortLabel("confidence", "Confidence")}</button></th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -358,7 +390,27 @@ export function App() {
                   <td>{renderMetricCell(lot, lot.latest_research?.high ?? null, "max")}</td>
                   <td>{renderMetricCell(lot, lot.latest_research?.median ?? null, "closest")}</td>
                   <td>
-                    {lot.latest_research ? `${Math.round(lot.latest_research.confidence * 100)}%` : "—"}
+                    {lot.latest_research ? (
+                      <div className="confidence-cell">
+                        <span>{`${Math.round(lot.latest_research.confidence * 100)}%`}</span>
+                        {hasAutoImageRecheck(lot.latest_research) && (
+                          <span className="auto-image-badge" title="Auto image recheck contributed to this pricing run.">
+                            image boosted
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      disabled={rerunLotId === lot.id}
+                      onClick={() => { rerunWithImage(lot.id).catch(() => undefined); }}
+                    >
+                      {rerunLotId === lot.id ? "Running..." : "Image recheck"}
+                    </button>
                   </td>
                 </tr>
               ))}

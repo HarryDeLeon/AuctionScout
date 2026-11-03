@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     target_margin_pct: float = 0.30
 
     enable_llm_query_builder: bool = True
+    enable_auto_image_recheck: bool = True
+    auto_image_recheck_confidence_threshold: float = 0.45
     enable_ebay_sold_prices: bool = False
     ebay_browse_base_url: str = "https://api.ebay.com/buy/browse/v1/item_summary/search"
     ebay_access_token: str | None = None

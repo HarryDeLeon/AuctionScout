@@ -66,8 +66,13 @@ class EbayWebFallbackSource:
             )
         return comparables
 
-    async def search(self, query: str, use_image: bool = False) -> list[ComparableRecord]:
-        del use_image
+    async def search(
+        self,
+        query: str,
+        use_image: bool = False,
+        image_url: str | None = None,
+    ) -> list[ComparableRecord]:
+        del use_image, image_url
         params = {
             "_nkw": query,
             "_sacat": "0",
