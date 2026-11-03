@@ -6,6 +6,7 @@ from urllib.parse import urlparse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.adapters.base import LotRecord
 from app.adapters.registry import registry
 from app.config import settings
 from app.db import SessionLocal
@@ -60,6 +61,69 @@ async def enqueue_search(search_id: int) -> None:
     asyncio.create_task(run_search(search_id))
 
 
+async def enqueue_manual_search(search_id: int, lots: list[LotRecord], import_warnings: list[str] | None = None) -> None:
+    import asyncio
+
+    asyncio.create_task(run_manual_search(search_id, lots, import_warnings or []))
+
+
+async def _persist_lot_and_research(db: AsyncSession, search: Search, lot_record: LotRecord) -> int:
+    lot = Lot(
+        search_id=search.id,
+        lot_number=lot_record.lot_number,
+        title=lot_record.title,
+        description=lot_record.description,
+        image_url=lot_record.image_url,
+        current_bid=lot_record.current_bid,
+        opening_bid=lot_record.opening_bid,
+        estimate_low=lot_record.estimate_low,
+        estimate_high=lot_record.estimate_high,
+        currency=lot_record.currency or settings.default_currency,
+        buyers_premium_pct=lot_record.buyers_premium_pct,
+        ends_at=lot_record.ends_at,
+        lot_url=lot_record.lot_url,
+        raw=lot_record.raw,
+        confidence=lot_record.confidence,
+    )
+    db.add(lot)
+    await db.flush()
+
+    query, comps, agg, warning = await pipeline.run(lot.title, lot.description, image_url=lot.image_url)
+    run = ResearchRun(
+        lot_id=lot.id,
+        query_text=query,
+        query_source="auto",
+        status="done",
+        low=agg.low,
+        high=agg.high,
+        median=agg.median,
+        sample_size=agg.sample_size,
+        confidence=agg.confidence,
+        warning=warning,
+    )
+    db.add(run)
+    await db.flush()
+
+    for comp in comps:
+        db.add(
+            Comparable(
+                research_run_id=run.id,
+                source=comp.source,
+                title=comp.title,
+                price=comp.price,
+                currency=comp.currency,
+                condition=comp.condition,
+                url=comp.url,
+                image_url=comp.image_url,
+                listing_type=comp.listing_type,
+                similarity=comp.similarity,
+            )
+        )
+
+    await db.commit()
+    return lot.id
+
+
 async def run_search(search_id: int) -> None:
     async with SessionLocal() as db:
         search = await db.get(Search, search_id)
@@ -103,65 +167,65 @@ async def run_search(search_id: int) -> None:
             await event_bus.publish(search_id, {"type": "progress", "status": "researching", "total": len(kept)})
 
             for lot_record in kept:
-                lot = Lot(
-                    search_id=search.id,
-                    lot_number=lot_record.lot_number,
-                    title=lot_record.title,
-                    description=lot_record.description,
-                    image_url=lot_record.image_url,
-                    current_bid=lot_record.current_bid,
-                    opening_bid=lot_record.opening_bid,
-                    estimate_low=lot_record.estimate_low,
-                    estimate_high=lot_record.estimate_high,
-                    currency=lot_record.currency or settings.default_currency,
-                    buyers_premium_pct=lot_record.buyers_premium_pct,
-                    ends_at=lot_record.ends_at,
-                    lot_url=lot_record.lot_url,
-                    raw=lot_record.raw,
-                    confidence=lot_record.confidence,
-                )
-                db.add(lot)
-                await db.flush()
-
-                query, comps, agg, warning = await pipeline.run(lot.title, lot.description, image_url=lot.image_url)
-                run = ResearchRun(
-                    lot_id=lot.id,
-                    query_text=query,
-                    query_source="auto",
-                    status="done",
-                    low=agg.low,
-                    high=agg.high,
-                    median=agg.median,
-                    sample_size=agg.sample_size,
-                    confidence=agg.confidence,
-                    warning=warning,
-                )
-                db.add(run)
-                await db.flush()
-
-                for comp in comps:
-                    db.add(
-                        Comparable(
-                            research_run_id=run.id,
-                            source=comp.source,
-                            title=comp.title,
-                            price=comp.price,
-                            currency=comp.currency,
-                            condition=comp.condition,
-                            url=comp.url,
-                            image_url=comp.image_url,
-                            listing_type=comp.listing_type,
-                            similarity=comp.similarity,
-                        )
-                    )
+                lot_id = await _persist_lot_and_research(db, search, lot_record)
 
                 search.progress_done += 1
                 await db.commit()
                 await event_bus.publish(
                     search_id,
-                    {"type": "lot_researched", "done": search.progress_done, "total": search.progress_total, "lot_id": lot.id},
+                    {"type": "lot_researched", "done": search.progress_done, "total": search.progress_total, "lot_id": lot_id},
                 )
 
+            search.status = "done"
+            search.finished_at = datetime.now(timezone.utc)
+            await db.commit()
+            await event_bus.publish(search_id, {"type": "done"})
+        except Exception as exc:  # noqa: BLE001
+            search.status = "failed"
+            search.error = str(exc)
+            search.finished_at = datetime.now(timezone.utc)
+            await db.commit()
+            await event_bus.publish(search_id, {"type": "error", "error": str(exc)})
+
+
+async def run_manual_search(search_id: int, manual_lots: list[LotRecord], import_warnings: list[str]) -> None:
+    async with SessionLocal() as db:
+        search = await db.get(Search, search_id)
+        if not search:
+            return
+        filtered: list[LotRecord] = []
+        for lot_record in manual_lots:
+            if not _lot_matches_price_filters(lot_record, search.min_price, search.max_price):
+                continue
+            if not _keyword_match(f"{lot_record.title} {lot_record.description or ''}", search.keywords):
+                continue
+            filtered.append(lot_record)
+
+        reverse = search.price_sort_order == "desc"
+        kept = sorted(filtered, key=_lot_price_value, reverse=reverse)[: search.max_items]
+
+        search.status = "researching"
+        search.site = "manual_csv"
+        search.progress_total = len(kept)
+        search.progress_done = 0
+        if import_warnings:
+            search.warning = "; ".join(import_warnings[:5])
+        await db.commit()
+        await event_bus.publish(search_id, {"type": "progress", "status": "researching", "total": len(kept)})
+
+        try:
+            for lot_record in kept:
+                lot_id = await _persist_lot_and_research(db, search, lot_record)
+                search.progress_done += 1
+                await db.commit()
+                await event_bus.publish(
+                    search_id,
+                    {"type": "lot_researched", "done": search.progress_done, "total": search.progress_total, "lot_id": lot_id},
+                )
+
+            if search.progress_done == 0:
+                extra = "No imported lots matched your filters."
+                search.warning = f"{search.warning}; {extra}" if search.warning else extra
             search.status = "done"
             search.finished_at = datetime.now(timezone.utc)
             await db.commit()

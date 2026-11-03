@@ -12,5 +12,6 @@ Requires-Dist: httpx>=0.28.1
 Requires-Dist: aiosqlite>=0.20.0
 Requires-Dist: sse-starlette>=2.1.3
 Requires-Dist: beautifulsoup4>=4.12.3
+Requires-Dist: python-multipart>=0.0.9
 Provides-Extra: dev
 Requires-Dist: pytest>=8.3.3; extra == "dev"

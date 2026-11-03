@@ -32,6 +32,39 @@ input, select, button {
   align-items: center;
 }
 
+.import-box {
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+}
+
+.import-label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.4rem;
+}
+
+.import-controls {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.import-help {
+  margin: 0.5rem 0 0;
+  color: #555;
+  font-size: 0.9rem;
+}
+
+.secondary-btn {
+  background: #eef1f6;
+  color: #1f2a37;
+  border: 1px solid #c8cfdb;
+  cursor: pointer;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;

@@ -65,11 +65,13 @@ export function App() {
   const [maxItems, setMaxItems] = useState(20);
   const [priceSortOrder, setPriceSortOrder] = useState<"asc" | "desc">("asc");
   const [keywords, setKeywords] = useState("");
+  const [csvFile, setCsvFile] = useState<File | null>(null);
   const [searchId, setSearchId] = useState<number | null>(null);
   const [search, setSearch] = useState<SearchDetail | null>(null);
   const [history, setHistory] = useState<SearchSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
   const [rerunLotId, setRerunLotId] = useState<number | null>(null);
   const [sortField, setSortField] = useState<SortField>("margin");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
@@ -249,6 +251,102 @@ export function App() {
     }
   }
 
+  async function importCsvLots() {
+    if (!csvFile) {
+      setError("Select a CSV file first.");
+      return;
+    }
+    setError(null);
+    setIsImporting(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", csvFile);
+      formData.append("name", searchName.trim() || "Manual CSV Import");
+      if (minPrice) {
+        formData.append("min_price", minPrice);
+      }
+      if (maxPrice) {
+        formData.append("max_price", maxPrice);
+      }
+      formData.append("max_items", String(maxItems));
+      formData.append("price_sort_order", priceSortOrder);
+      if (keywords.trim()) {
+        formData.append("keywords", keywords.trim());
+      }
+
+      const res = await fetch(`${API_BASE}/api/searches/import-csv`, {
+        method: "POST",
+        body: formData,
+      });
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
+      const body = (await res.json()) as { search_id: number };
+      setSearchId(body.search_id);
+      await loadSearch(body.search_id, true);
+      await loadHistory();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "CSV import failed");
+    } finally {
+      setIsImporting(false);
+    }
+  }
+
+  function downloadCsvTemplate() {
+    const rows = [
+      [
+        "title",
+        "lot_number",
+        "current_bid",
+        "opening_bid",
+        "estimate_low",
+        "estimate_high",
+        "image_url",
+        "lot_url",
+        "description",
+        "currency",
+      ],
+      [
+        "Gold Ring 14k",
+        "101",
+        "450.00",
+        "400.00",
+        "500.00",
+        "700.00",
+        "https://images.example.com/lot-101.jpg",
+        "https://auction.example.com/lot-101",
+        "Vintage 14k gold ring with hallmark.",
+        "CAD",
+      ],
+      [
+        "Diamond Pendant",
+        "102",
+        "999.99",
+        "800.00",
+        "1000.00",
+        "1500.00",
+        "https://images.example.com/lot-102.jpg",
+        "https://auction.example.com/lot-102",
+        "Round brilliant pendant in white gold setting.",
+        "USD",
+      ],
+    ];
+
+    const csv = rows
+      .map((cols) => cols.map((col) => `"${String(col).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "auction_scout_lot_template.csv";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
   async function rerunWithImage(lotId: number) {
     if (!search) {
       return;
@@ -338,6 +436,30 @@ export function App() {
           <button type="submit" disabled={isSubmitting}>{isSubmitting ? "Searching..." : "Search"}</button>
         </div>
       </form>
+      <div className="import-box">
+        <label htmlFor="csv-import" className="import-label">Import lots from CSV</label>
+        <div className="import-controls">
+          <input
+            id="csv-import"
+            type="file"
+            accept=".csv,text/csv"
+            onChange={(e) => {
+              const file = e.target.files?.[0] ?? null;
+              setCsvFile(file);
+            }}
+          />
+          <button type="button" onClick={() => { importCsvLots().catch(() => undefined); }} disabled={isImporting}>
+            {isImporting ? "Importing..." : "Import CSV"}
+          </button>
+          <button type="button" className="secondary-btn" onClick={downloadCsvTemplate}>
+            Download template
+          </button>
+        </div>
+        <p className="import-help">
+          Required: title. Optional: lot_number, current_bid, opening_bid, estimate_low, estimate_high, image_url,
+          lot_url, description, currency, buyers_premium_pct, ends_at.
+        </p>
+      </div>
       {error && <p className="error">{error}</p>}
       {search && (
         <section>
