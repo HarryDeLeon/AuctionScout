@@ -25,6 +25,18 @@ def test_liveauctioneers_fixture_parse():
     assert lots[0].lot_url == "https://www.liveauctioneers.com/item/101"
 
 
+def test_liveauctioneers_block_page_detection():
+    adapter = LiveAuctioneersAdapter()
+    blocked_html = "<html><body>Request unsuccessful. Incapsula incident ID: 12345</body></html>"
+    assert adapter._looks_like_block_page(blocked_html)
+
+
+def test_liveauctioneers_non_block_page_detection():
+    adapter = LiveAuctioneersAdapter()
+    normal_html = _read_fixture("liveauctioneers_sample.html")
+    assert not adapter._looks_like_block_page(normal_html)
+
+
 def test_urbanauctions_fixture_parse():
     adapter = UrbanAuctionsAdapter()
     lots = adapter.parse_lots(

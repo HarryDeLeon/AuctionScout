@@ -13,6 +13,19 @@ class LiveAuctioneersAdapter:
     name = "liveauctioneers"
     url_patterns = [re.compile(r"liveauctioneers\.com", re.IGNORECASE)]
 
+    @staticmethod
+    def _looks_like_block_page(html: str) -> bool:
+        lowered = html.lower()
+        markers = [
+            "incapsula",
+            "_incap_",
+            "request unsuccessful",
+            "please enable javascript",
+            "security check",
+            "pardon the interruption",
+        ]
+        return any(marker in lowered for marker in markers)
+
     def parse_lots(self, html: str, source_url: str, max_items: int = 50) -> list[LotRecord]:
         soup = BeautifulSoup(html, "html.parser")
         lots: list[LotRecord] = []
@@ -60,4 +73,9 @@ class LiveAuctioneersAdapter:
         async with httpx.AsyncClient(timeout=20.0, follow_redirects=True, headers=headers) as client:
             response = await client.get(url)
             response.raise_for_status()
+        if self._looks_like_block_page(response.text):
+            raise RuntimeError(
+                "LiveAuctioneers blocked automated access for this request (anti-bot page returned). "
+                "Try again later or run with a different source URL."
+            )
         return self.parse_lots(response.text, source_url=url, max_items=max_items)

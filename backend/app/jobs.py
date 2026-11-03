@@ -83,6 +83,14 @@ async def run_search(search_id: int) -> None:
                 if not _keyword_match(f"{lot.title} {lot.description or ''}", search.keywords):
                     continue
                 kept.append(lot)
+
+            if not fetched:
+                search.warning = (
+                    f"No lots could be extracted from {search.site}. The page may be dynamic, blocked, or the parser needs an update."
+                )
+            elif not kept:
+                search.warning = "No lots matched your filters. Try widening min/max price or removing keywords."
+
             reverse = search.price_sort_order == "desc"
             kept = sorted(kept, key=_lot_price_value, reverse=reverse)[: search.max_items]
 
